@@ -33,4 +33,17 @@ public class Base62ServiceImpl implements Base62Service {
         }
         return id;
     }
+
+    /**
+     * Generates a random Base62 string of specified length.
+     */
+    @Override
+    public String generateRandomCode(int length) {
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(BASE62.charAt(random.nextInt(BASE62.length())));
+        }
+        return sb.toString();
+    }
 }

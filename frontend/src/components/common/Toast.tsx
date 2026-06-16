@@ -1,61 +1,42 @@
-import React from 'react';
-import { useToastStore, type ToastType } from '../../store/useToastStore';
-import { 
-  CheckCircleIcon, 
-  XCircleIcon, 
-  InformationCircleIcon, 
-  ExclamationTriangleIcon,
-  XMarkIcon 
-} from '@heroicons/react/24/outline';
+import { useToastStore } from '../../store/useToastStore';
 
-const ToastContainer: React.FC = () => {
-  const { toasts, removeToast } = useToastStore();
+type ToastType = 'success' | 'error' | 'info' | 'warning';
 
-  const getIcon = (type: ToastType) => {
-    switch (type) {
-      case 'success': return <CheckCircleIcon className="h-6 w-6 text-green-500" />;
-      case 'error': return <XCircleIcon className="h-6 w-6 text-red-500" />;
-      case 'warning': return <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />;
-      case 'info': return <InformationCircleIcon className="h-6 w-6 text-blue-500" />;
-    }
-  };
+const colors: Record<ToastType, { bg: string; border: string; text: string }> = {
+  success: { bg: 'rgba(0,212,170,0.1)', border: 'rgba(0,212,170,0.3)', text: '#00d4aa' },
+  error: { bg: 'rgba(255,107,107,0.1)', border: 'rgba(255,107,107,0.3)', text: '#ff6b6b' },
+  info: { bg: 'rgba(108,99,255,0.1)', border: 'rgba(108,99,255,0.3)', text: '#7d75ff' },
+  warning: { bg: 'rgba(255,179,71,0.1)', border: 'rgba(255,179,71,0.3)', text: '#ffb347' },
+};
 
-  const getBgColor = (type: ToastType) => {
-    switch (type) {
-      case 'success': return 'bg-green-50 border-green-200';
-      case 'error': return 'bg-red-50 border-red-200';
-      case 'warning': return 'bg-yellow-50 border-yellow-200';
-      case 'info': return 'bg-blue-50 border-blue-200';
-    }
-  };
+const icons: Record<ToastType, string> = {
+  success: '✓', error: '✕', info: 'ℹ', warning: '⚠',
+};
+
+export const Toast = ({ id, type, message }: { id: string; type: ToastType; message: string }) => {
+  const removeToast = useToastStore((s) => s.removeToast);
+  const { bg, border, text } = colors[type];
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
-      {toasts.map((toast) => (
-        <div 
-          key={toast.id}
-          className={`flex items-start p-4 rounded-lg border shadow-lg animate-slide-in ${getBgColor(toast.type)}`}
-        >
-          <div className="flex-shrink-0">
-            {getIcon(toast.type)}
-          </div>
-          <div className="ml-3 flex-1">
-            <p className="text-sm font-medium text-gray-900">
-              {toast.message}
-            </p>
-          </div>
-          <div className="ml-4 flex-shrink-0 flex">
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="inline-flex text-gray-400 hover:text-gray-500 focus:outline-none"
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-      ))}
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: '10px',
+        background: bg, border: `1px solid ${border}`,
+        borderRadius: '10px', padding: '12px 16px',
+        minWidth: '280px', maxWidth: '360px',
+        backdropFilter: 'blur(12px)',
+        animation: 'fadeIn 0.3s ease',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+      }}
+    >
+      <span style={{ color: text, fontWeight: 700, fontSize: '16px' }}>{icons[type]}</span>
+      <span style={{ color: '#f0f0f5', fontSize: '14px', flex: 1 }}>{message}</span>
+      <button
+        onClick={() => removeToast(id)}
+        style={{ color: '#555566', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', lineHeight: 1 }}
+      >
+        ×
+      </button>
     </div>
   );
 };
-
-export default ToastContainer;

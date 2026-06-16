@@ -24,7 +24,7 @@ public class Url {
     private Long id;
 
     @Column(name = "user_id")
-    private Long userId;
+    private Long userId;   // NULL = guest
 
     @Column(name = "original_url", nullable = false, columnDefinition = "TEXT")
     private String originalUrl;

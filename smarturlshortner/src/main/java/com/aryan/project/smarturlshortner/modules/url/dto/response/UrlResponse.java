@@ -19,5 +19,7 @@ public class UrlResponse {
     private LocalDateTime expiryDate;
     private Long totalClicks;
     private Long uniqueClicks;
+    private String qrCodeUrl;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

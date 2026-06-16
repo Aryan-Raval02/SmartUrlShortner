@@ -1,26 +1,81 @@
 import axios from 'axios';
-import type { ApiErrorResponse } from './urlApi';
+import { useAuthStore } from '../store/useAuthStore';
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+const axiosInstance = axios.create({
+  baseURL: 'http://localhost:8080',
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 10000,
 });
 
-// Intercept errors to extract backend error response
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && error.response.data) {
-      // Backend returns ApiErrorResponse structure
-      return Promise.reject(error.response.data as ApiErrorResponse);
+// Request interceptor: attach Bearer token
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = useAuthStore.getState().accessToken;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    return Promise.reject({
-      message: error.message || 'An unexpected error occurred',
-      status: 500
-    } as ApiErrorResponse);
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor: auto-refresh on 401
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (value: unknown) => void; reject: (reason?: unknown) => void }> = [];
+
+const processQueue = (error: unknown, token: string | null = null) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error);
+    else resolve(token);
+  });
+  failedQueue = [];
+};
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then((token) => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return axiosInstance(originalRequest);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = useAuthStore.getState().refreshToken;
+
+      if (!refreshToken) {
+        useAuthStore.getState().clearAuth();
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
+      try {
+        const response = await axios.post('http://localhost:8080/api/v1/auth/refresh', { refreshToken });
+        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+        useAuthStore.getState().setTokens(accessToken, newRefreshToken);
+        processQueue(null, accessToken);
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return axiosInstance(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        useAuthStore.getState().clearAuth();
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    return Promise.reject(error);
   }
 );
 
-export default api;
+export default axiosInstance;

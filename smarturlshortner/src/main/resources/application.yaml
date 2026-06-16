@@ -10,11 +10,12 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
   data:
     redis:
@@ -24,6 +25,48 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  mail:
+    host: smtp-relay.brevo.com
+    port: 587
+    username: ${BREVO_SMTP_USERNAME}
+    password: ${BREVO_SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 16
+        queue-capacity: 100
+      thread-name-prefix: shortly-async-
+
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
 
 server:
   port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:dGhpcyBpcyBhIHZlcnkgbG9uZyBzZWNyZXQga2V5IGZvciBqd3Qgc2lnbmluZyBwdXJwb3NlcyBvbmx5}
+  access-token-expiry: 900
+  refresh-token-expiry: 2592000
+
+app:
+  base-url: http://localhost:8080
+  frontend-url: http://localhost:5173
+  mail-from: ${BREVO_FROM_EMAIL:noreply@shortly.com}
+  avatar-upload-dir: uploads/avatars/
+  brute-force:
+    max-attempts: 5
+    lock-duration-minutes: 30
+  rate-limit:
+    guest-daily-limit: 5

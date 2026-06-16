@@ -1,165 +1,182 @@
-import React, { useState } from 'react';
-import Button from '../components/common/Button';
-import { createShortUrl, type UrlResponse, type ApiErrorResponse } from '../api/urlApi';
-import { 
-  ClipboardDocumentIcon, 
-  QrCodeIcon, 
-  ArrowTopRightOnSquareIcon,
-  ChevronDownIcon,
-  ChevronUpIcon
-} from '@heroicons/react/24/outline';
-import { useToastStore } from '../store/useToastStore';
+import { useState, useEffect } from 'react';
+import { urlApi } from '../api/urlApi';
+import { authApi } from '../api/authApi';
+import { useAuthStore } from '../store/useAuthStore';
+import { toast } from '../store/useToastStore';
 
-const LandingPage: React.FC = () => {
+interface PublicStats { totalUrls: number; totalClicks: number; totalUsers: number; }
+
+export default function LandingPage() {
   const [url, setUrl] = useState('');
-  const [alias, setAlias] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [shortenResult, setShortenResult] = useState<UrlResponse | null>(null);
-  const { addToast } = useToastStore();
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ shortUrl: string } | null>(null);
+  const [stats, setStats] = useState<PublicStats | null>(null);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  useEffect(() => {
+    authApi.getPublicStats()
+      .then((res) => setStats(res.data.data))
+      .catch(() => {});
+  }, []);
 
   const handleShorten = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url) return;
-    
-    setIsLoading(true);
+    if (!url) { toast.error('Please enter a URL'); return; }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) { toast.error('URL must start with http:// or https://'); return; }
+    setLoading(true);
     try {
-      const response = await createShortUrl({ 
-        originalUrl: url,
-        customAlias: alias || undefined
-      });
-      setShortenResult(response.data);
-      addToast(response.message || 'URL shortened successfully!', 'success');
-    } catch (error) {
-      const apiError = error as ApiErrorResponse;
-      console.error('Shortening failed:', apiError);
-      
-      const message = apiError.message || 'Failed to shorten URL';
-      addToast(message, 'error');
-      
-      if (apiError.validationErrors) {
-        Object.entries(apiError.validationErrors).forEach(([field, msg]) => {
-          console.warn(`Validation error on ${field}: ${msg}`);
-        });
-      }
-    } finally {
-      setIsLoading(false);
-    }
+      const res = await urlApi.create({ originalUrl: url });
+      setResult({ shortUrl: res.data.data?.shortUrl });
+      toast.success('Short URL created!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Failed to shorten URL';
+      toast.error(msg.includes('rate limit') ? '5 URLs/day limit reached. Sign up for unlimited!' : msg);
+    } finally { setLoading(false); }
   };
 
-  const copyToClipboard = () => {
-    if (shortenResult) {
-      navigator.clipboard.writeText(shortenResult.shortUrl);
-      addToast('Copied to clipboard!', 'info');
-    }
-  };
+  const copyResult = () => { if (result) { navigator.clipboard.writeText(result.shortUrl); toast.success('Copied!'); } };
 
   return (
-    <div className="bg-gradient-to-b from-indigo-50 to-white py-20 lg:py-32">
-      <div className="max-w-7xl mx-auto px-4 text-center">
-        <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight">
-          🔗 Smart URL Shortener
-        </h1>
-        <p className="mt-6 text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
-          Shorten, track, and manage your links with powerful built-in analytics.
-          O(1) redirection powered by Redis caching.
-        </p>
+    <div>
+      {/* Hero */}
+      <section style={{ minHeight: '90vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '80px 24px', position: 'relative', overflow: 'hidden' }}>
+        {/* Background blur orbs */}
+        <div style={{ position: 'absolute', top: '10%', left: '20%', width: 400, height: 400, borderRadius: '50%', background: 'rgba(108, 99, 255, 0.08)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '20%', right: '20%', width: 300, height: 300, borderRadius: '50%', background: 'rgba(0, 212, 170, 0.06)', filter: 'blur(60px)', pointerEvents: 'none' }} />
 
-        <form onSubmit={handleShorten} className="mt-10 max-w-2xl mx-auto space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="url"
-              required
-              placeholder="https://paste-your-long-link-here"
-              className="flex-1 px-5 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm bg-white"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-            />
-            <Button type="submit" isLoading={isLoading} className="px-8 py-4 text-base">
-              Shorten →
-            </Button>
+        <div style={{ position: 'relative', maxWidth: '800px', width: '100%', animation: 'fadeIn 0.6s ease' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(108,99,255,0.1)', border: '1px solid rgba(108,99,255,0.2)', borderRadius: '20px', padding: '6px 16px', marginBottom: '32px', color: '#7d75ff', fontSize: '13px', fontWeight: 500 }}>
+            ✨ Smart URL Shortener
           </div>
 
-          <div className="flex flex-col items-start">
-            <button 
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-indigo-600 text-sm font-medium flex items-center gap-1 hover:text-indigo-700 transition-colors"
-            >
-              {showAdvanced ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
-              Advanced Options
-            </button>
-            
-            {showAdvanced && (
-              <div className="w-full mt-3 animate-fade-in">
-                <label className="block text-sm font-medium text-gray-700 mb-1 text-left">
-                  Custom Alias (optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. my-cool-link"
-                  className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm bg-white"
-                  value={alias}
-                  onChange={(e) => setAlias(e.target.value)}
-                />
+          <h1 style={{ fontSize: 'clamp(36px, 6vw, 72px)', fontWeight: 900, lineHeight: 1.1, marginBottom: '20px', color: '#f0f0f5' }}>
+            Shorten. Share.{' '}
+            <span style={{ background: 'linear-gradient(135deg, #6c63ff, #00d4aa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              Analyze.
+            </span>
+          </h1>
+
+          <p style={{ fontSize: '18px', color: '#8888aa', maxWidth: '560px', margin: '0 auto 48px', lineHeight: 1.7 }}>
+            Create powerful short links with analytics, QR codes, expiry dates, and password protection — all in seconds.
+          </p>
+
+          {/* URL Shortener Input */}
+          {!result ? (
+            <form onSubmit={handleShorten} style={{ display: 'flex', gap: '10px', maxWidth: '640px', margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <input
+                id="hero-url-input"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Paste your long URL here..."
+                style={{
+                  flex: 1, minWidth: '280px', padding: '16px 20px',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '12px', color: '#f0f0f5', fontSize: '16px',
+                  outline: 'none', transition: 'border-color 200ms',
+                }}
+                onFocus={(e) => { e.target.style.borderColor = '#6c63ff'; }}
+                onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; }}
+              />
+              <button
+                id="hero-shorten-btn"
+                type="submit"
+                disabled={loading}
+                style={{
+                  padding: '16px 32px', borderRadius: '12px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+                  background: 'linear-gradient(135deg, #6c63ff, #7d75ff)',
+                  color: '#fff', fontSize: '16px', fontWeight: 700, opacity: loading ? 0.7 : 1,
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  boxShadow: '0 0 30px rgba(108,99,255,0.3)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {loading && <span style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
+                {loading ? 'Shortening...' : '🔗 Shorten URL'}
+              </button>
+            </form>
+          ) : (
+            <div style={{ maxWidth: '640px', margin: '0 auto', background: 'rgba(0,212,170,0.05)', border: '1px solid rgba(0,212,170,0.2)', borderRadius: '16px', padding: '24px', animation: 'fadeIn 0.4s ease' }}>
+              <p style={{ color: '#8888aa', fontSize: '13px', marginBottom: '8px' }}>Your short URL:</p>
+              <p style={{ color: '#00d4aa', fontSize: '22px', fontWeight: 700, marginBottom: '16px', wordBreak: 'break-all' }}>{result.shortUrl}</p>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button onClick={copyResult} style={{ padding: '10px 24px', background: 'linear-gradient(135deg, #6c63ff, #7d75ff)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>📋 Copy</button>
+                <a href={result.shortUrl} target="_blank" rel="noreferrer" style={{ padding: '10px 24px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#f0f0f5', fontWeight: 500 }}>🔗 Test Link</a>
+                <button onClick={() => { setResult(null); setUrl(''); }} style={{ padding: '10px 24px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: '#8888aa', cursor: 'pointer' }}>Shorten Another</button>
               </div>
-            )}
-          </div>
-        </form>
+              {!isAuthenticated && (
+                <p style={{ marginTop: '16px', color: '#555566', fontSize: '13px' }}>
+                  <a href="/register" style={{ color: '#6c63ff' }}>Sign up for free</a> to track clicks, add expiry dates, and more!
+                </p>
+              )}
+            </div>
+          )}
 
-        <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-gray-500">
-          <span>✓ Free to use</span>
-          <span>✓ High Performance</span>
-          <span>✓ Custom aliases</span>
+          {!isAuthenticated && (
+            <p style={{ marginTop: '20px', color: '#555566', fontSize: '14px' }}>
+              No account needed to shorten · 5 URLs/day for guests · <a href="/register" style={{ color: '#6c63ff' }}>Sign up for unlimited</a>
+            </p>
+          )}
         </div>
+      </section>
 
-        {shortenResult && (
-          <div className="mt-12 max-w-2xl mx-auto bg-white rounded-xl shadow-lg border border-gray-200 p-6 animate-fade-in text-left">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span className="text-green-500">✅</span> Your shortened link is ready!
-            </h3>
-            
-            <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-indigo-600 font-semibold truncate">
-                  {shortenResult.shortUrl}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={copyToClipboard}
-                    className="p-2 hover:bg-gray-200 rounded-md transition-colors title='Copy'"
-                  >
-                    <ClipboardDocumentIcon className="h-5 w-5 text-gray-600" />
-                  </button>
-                  <a 
-                    href={shortenResult.shortUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="p-2 hover:bg-gray-200 rounded-md transition-colors"
-                  >
-                    <ArrowTopRightOnSquareIcon className="h-5 w-5 text-gray-600" />
-                  </a>
-                </div>
+      {/* Stats */}
+      {stats && (
+        <section style={{ padding: '48px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '32px', textAlign: 'center' }}>
+            {[
+              { label: 'Short URLs Created', value: stats.totalUrls.toLocaleString(), color: '#6c63ff' },
+              { label: 'Total Clicks Tracked', value: stats.totalClicks.toLocaleString(), color: '#00d4aa' },
+              { label: 'Happy Users', value: stats.totalUsers.toLocaleString(), color: '#7d75ff' },
+            ].map((s) => (
+              <div key={s.label}>
+                <div style={{ fontSize: '36px', fontWeight: 800, color: s.color, marginBottom: '6px' }}>{s.value}</div>
+                <div style={{ color: '#555566', fontSize: '14px' }}>{s.label}</div>
               </div>
-              
-              <div className="text-xs text-gray-400 truncate">
-                Original: {shortenResult.originalUrl}
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center justify-between">
-              <Button variant="ghost" onClick={() => setShortenResult(null)}>
-                Shorten Another
-              </Button>
-              <Button variant="secondary" className="gap-2">
-                <QrCodeIcon className="h-4 w-4" /> Get QR Code
-              </Button>
-            </div>
+            ))}
           </div>
-        )}
-      </div>
+        </section>
+      )}
+
+      {/* Features */}
+      <section style={{ padding: '80px 24px' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          <h2 style={{ textAlign: 'center', fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, color: '#f0f0f5', marginBottom: '16px' }}>Everything you need</h2>
+          <p style={{ textAlign: 'center', color: '#8888aa', marginBottom: '56px', maxWidth: '500px', margin: '0 auto 56px' }}>A complete link management platform with analytics, security, and more.</p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+            {[
+              { icon: '📊', title: 'Click Analytics', desc: 'Track clicks, browsers, devices, countries, and referrers in real-time with beautiful charts.' },
+              { icon: '🔒', title: 'Password Protection', desc: 'Add a password to your links so only authorized people can access them.' },
+              { icon: '⏰', title: 'Link Expiry', desc: 'Set expiration dates on your links. They automatically deactivate when the time comes.' },
+              { icon: '🎨', title: 'Custom Aliases', desc: 'Choose your own short code like /my-promo instead of a random string.' },
+              { icon: '📱', title: 'QR Code Generation', desc: 'Instantly generate scannable QR codes for any of your short links.' },
+              { icon: '🛡', title: 'Admin Controls', desc: 'Full admin panel to manage all users and URLs across the platform.' },
+            ].map((f) => (
+              <div key={f.title} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '28px', transition: 'border-color 300ms, transform 300ms' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(108,99,255,0.3)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.07)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; }}
+              >
+                <div style={{ fontSize: '32px', marginBottom: '16px' }}>{f.icon}</div>
+                <h3 style={{ color: '#f0f0f5', fontWeight: 600, marginBottom: '8px', fontSize: '17px' }}>{f.title}</h3>
+                <p style={{ color: '#8888aa', fontSize: '14px', lineHeight: 1.6 }}>{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      {!isAuthenticated && (
+        <section style={{ padding: '80px 24px', textAlign: 'center' }}>
+          <div style={{ maxWidth: '600px', margin: '0 auto', background: 'linear-gradient(135deg, rgba(108,99,255,0.12), rgba(0,212,170,0.08))', border: '1px solid rgba(108,99,255,0.2)', borderRadius: '24px', padding: '56px 40px' }}>
+            <h2 style={{ fontSize: '36px', fontWeight: 800, color: '#f0f0f5', marginBottom: '16px' }}>Start for free today</h2>
+            <p style={{ color: '#8888aa', marginBottom: '32px', fontSize: '16px' }}>No credit card required. Unlimited links, full analytics.</p>
+            <a href="/register" style={{ display: 'inline-block', padding: '16px 40px', background: 'linear-gradient(135deg, #6c63ff, #7d75ff)', borderRadius: '12px', color: '#fff', fontSize: '17px', fontWeight: 700, boxShadow: '0 0 30px rgba(108,99,255,0.3)', textDecoration: 'none' }}>Create free account →</a>
+          </div>
+        </section>
+      )}
     </div>
   );
-};
-
-export default LandingPage;
+}

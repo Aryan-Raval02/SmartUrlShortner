@@ -1,26 +1,27 @@
 -- V1: Create Initial Schema for URLs
+-- NOTE: users table is created in V2; user_id FK added in V5 after both tables exist
 CREATE TABLE urls (
-    id              BIGSERIAL PRIMARY KEY,
-    user_id         BIGINT, -- NULL for guest
+    id                  BIGSERIAL PRIMARY KEY,
+    user_id             BIGINT,                -- NULL for guest; FK added in V5
 
-    original_url    TEXT NOT NULL,
-    short_code      VARCHAR(50) UNIQUE NOT NULL,
-    title           VARCHAR(150),
+    original_url        TEXT NOT NULL,
+    short_code          VARCHAR(50) UNIQUE NOT NULL,
+    title               VARCHAR(150),
 
-    active          BOOLEAN DEFAULT TRUE,
-    deleted         BOOLEAN DEFAULT FALSE,
-    expiry_date     TIMESTAMP,
-    password_hash   VARCHAR(255),           -- optional link password
+    active              BOOLEAN DEFAULT TRUE,
+    deleted             BOOLEAN DEFAULT FALSE,
+    expiry_date         TIMESTAMP,
+    password_hash       VARCHAR(255),           -- optional link password
 
-    total_clicks    BIGINT DEFAULT 0,
-    unique_clicks   BIGINT DEFAULT 0,
+    total_clicks        BIGINT DEFAULT 0,
+    unique_clicks       BIGINT DEFAULT 0,
 
     -- Flags
-    suspicious      BOOLEAN DEFAULT FALSE,
-    suspicious_reason VARCHAR(255),
+    suspicious          BOOLEAN DEFAULT FALSE,
+    suspicious_reason   VARCHAR(255),
 
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_short_code ON urls(short_code);
